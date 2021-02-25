@@ -22,7 +22,7 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
         void DiscardSolutionUpdate();
 
         void OnSourceFileUpdated(Document document);
-
+        Task OnSourceFileUpdatedAsync(Document document);
         void StartDebuggingSession(Solution solution);
         void StartEditSession(IManagedEditAndContinueDebuggerService debuggerService, out ImmutableArray<DocumentId> documentsToReanalyze);
         void EndEditSession(out ImmutableArray<DocumentId> documentsToReanalyze);
