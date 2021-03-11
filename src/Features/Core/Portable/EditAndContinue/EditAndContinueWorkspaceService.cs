@@ -87,13 +87,6 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
             return new CompilationOutputFilesWithImplicitPdbPath(project.CompilationOutputInfo.AssemblyPath);
         }
 
-        public async Task OnSourceFileUpdatedAsync(Document document, CancellationToken cancellationToken)
-        {
-            var debuggingSession = _debuggingSession;
-            Contract.ThrowIfNull(debuggingSession, $"{nameof(OnSourceFileUpdatedAsync)} should only be invoked during a debugging session.");
-            await debuggingSession.LastCommittedSolution.OnSourceFileUpdatedAsync(document, cancellationToken).ConfigureAwait(false);
-        }
-
         public void OnSourceFileUpdated(Document document)
         {
             var debuggingSession = _debuggingSession;
@@ -104,11 +97,11 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
             }
         }
 
-        public Task OnSourceFileUpdatedAsync(Document document)
+        public async Task OnSourceFileUpdatedAsync(Document document, CancellationToken cancellationToken)
         {
             var debuggingSession = _debuggingSession;
             Contract.ThrowIfNull(debuggingSession, $"{nameof(OnSourceFileUpdatedAsync)} should only be invoked during a debugging session.");
-            return debuggingSession.LastCommittedSolution.OnSourceFileUpdatedAsync(document, debuggingSession.CancellationToken);
+            await debuggingSession.LastCommittedSolution.OnSourceFileUpdatedAsync(document, cancellationToken).ConfigureAwait(false);
         }
 
         public void StartDebuggingSession(Solution solution)
@@ -117,8 +110,8 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
             Contract.ThrowIfFalse(previousSession == null, "New debugging session can't be started until the existing one has ended.");
         }
 
-        public void StartEditSession(out ImmutableArray<DocumentId> documentsToReanalyze)
-            => StartEditSession(StubManagedEditAndContinueDebuggerService.Instance, out documentsToReanalyze);
+        public void StartEditSession()
+            => StartEditSession(StubManagedEditAndContinueDebuggerService.Instance, out _);
 
         public void StartEditSession(IManagedEditAndContinueDebuggerService debuggerService, out ImmutableArray<DocumentId> documentsToReanalyze)
         {
@@ -395,19 +388,6 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
             return editSession.HasChangesAsync(solution, solutionActiveStatementSpanProvider, sourceFilePath, cancellationToken);
         }
 
-        public async ValueTask<(ManagedModuleUpdates2 Updates, ImmutableArray<DiagnosticData> Diagnostics)>
-            EmitSolutionUpdate2Async(Solution solution, CancellationToken cancellationToken)
-        {
-            SolutionActiveStatementSpanProvider nullProvider = (_, _) => new(ImmutableArray<TextSpan>.Empty);
-            var (Updates, Diagnostics) = await EmitSolutionUpdateAsync(solution, nullProvider, cancellationToken).ConfigureAwait(false);
-
-            var updates2 = new ManagedModuleUpdates2(
-                (ManagedModuleUpdateStatus2)Updates.Status,
-                ImmutableArray.CreateRange(Updates.Updates.Select(u => new ManagedModuleUpdate2(u.Module, u.ILDelta, u.MetadataDelta, u.PdbDelta, u.UpdatedMethods))));
-
-            return (updates2, Diagnostics);
-        }
-
         public async ValueTask<(ManagedModuleUpdates Updates, ImmutableArray<DiagnosticData> Diagnostics)>
             EmitSolutionUpdateAsync(Solution solution, SolutionActiveStatementSpanProvider activeStatementSpanProvider, CancellationToken cancellationToken)
         {
@@ -426,6 +406,17 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
             // Note that we may return empty deltas if all updates have been deferred.
             // The debugger will still call commit or discard on the update batch.
             return (solutionUpdate.ModuleUpdates, ToDiagnosticData(solution, solutionUpdate.Diagnostics));
+        }
+
+        public async ValueTask<EditAndContinueManagedModuleUpdates> EmitSolutionUpdate2Async(Solution solution, CancellationToken cancellationToken)
+        {
+            var (updates, _) = await EmitSolutionUpdateAsync(solution, (_, __) => new(ImmutableArray<TextSpan>.Empty), cancellationToken).ConfigureAwait(false);
+
+            var transformed = new EditAndContinueManagedModuleUpdates(
+                (EditAndContinueManagedModuleUpdateStatus)updates.Status,
+                ImmutableArray.CreateRange(updates.Updates, update => new EditAndContinueManagedModuleUpdate(update.Module, update.ILDelta, update.MetadataDelta, update.PdbDelta, update.UpdatedMethods)));
+
+            return transformed;
         }
 
         private static ImmutableArray<DiagnosticData> ToDiagnosticData(Solution solution, ImmutableArray<(ProjectId ProjectId, ImmutableArray<Diagnostic> Diagnostics)> diagnosticsByProject)
@@ -684,24 +675,6 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
                         map["RudeEditBlocking"] = editSessionData.HadRudeEdits;
                     }));
                 }
-            }
-        }
-
-        private class StubManagedEditAndContinueDebuggerService : IManagedEditAndContinueDebuggerService
-        {
-            public static readonly StubManagedEditAndContinueDebuggerService Instance = new();
-
-            public Task<ImmutableArray<ManagedActiveStatementDebugInfo>> GetActiveStatementsAsync(CancellationToken cancellationToken)
-                => Task.FromResult(ImmutableArray<ManagedActiveStatementDebugInfo>.Empty);
-
-            public Task<ManagedEditAndContinueAvailability> GetAvailabilityAsync(Guid moduleVersionId, CancellationToken cancellationToken)
-            {
-                return Task.FromResult(new ManagedEditAndContinueAvailability(ManagedEditAndContinueAvailabilityStatus.Available));
-            }
-
-            public Task PrepareModuleForUpdateAsync(Guid moduleVersionId, CancellationToken cancellationToken)
-            {
-                return Task.CompletedTask;
             }
         }
     }

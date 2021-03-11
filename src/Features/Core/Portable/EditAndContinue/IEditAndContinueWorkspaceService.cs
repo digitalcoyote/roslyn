@@ -2,6 +2,7 @@
 // The .NET Foundation licenses this file to you under the MIT license.
 // See the LICENSE file in the project root for more information.
 
+using System;
 using System.Collections.Immutable;
 using System.Threading;
 using System.Threading.Tasks;
@@ -17,14 +18,18 @@ namespace Microsoft.CodeAnalysis.EditAndContinue
         ValueTask<ImmutableArray<Diagnostic>> GetDocumentDiagnosticsAsync(Document document, DocumentActiveStatementSpanProvider activeStatementSpanProvider, CancellationToken cancellationToken);
         ValueTask<bool> HasChangesAsync(Solution solution, SolutionActiveStatementSpanProvider activeStatementSpanProvider, string? sourceFilePath, CancellationToken cancellationToken);
         ValueTask<(ManagedModuleUpdates Updates, ImmutableArray<DiagnosticData> Diagnostics)> EmitSolutionUpdateAsync(Solution solution, SolutionActiveStatementSpanProvider activeStatementSpanProvider, CancellationToken cancellationToken);
+        ValueTask<EditAndContinueManagedModuleUpdates> EmitSolutionUpdate2Async(Solution solution, CancellationToken cancellationToken);
 
         void CommitSolutionUpdate();
         void DiscardSolutionUpdate();
 
         void OnSourceFileUpdated(Document document);
-        Task OnSourceFileUpdatedAsync(Document document);
+        Task OnSourceFileUpdatedAsync(Document document, CancellationToken cancellationToken);
+
         void StartDebuggingSession(Solution solution);
         void StartEditSession(IManagedEditAndContinueDebuggerService debuggerService, out ImmutableArray<DocumentId> documentsToReanalyze);
+        void StartEditSession();
+
         void EndEditSession(out ImmutableArray<DocumentId> documentsToReanalyze);
         void EndDebuggingSession(out ImmutableArray<DocumentId> documentsToReanalyze);
 

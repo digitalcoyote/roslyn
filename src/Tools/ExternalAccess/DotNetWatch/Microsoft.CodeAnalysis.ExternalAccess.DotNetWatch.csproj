@@ -17,13 +17,14 @@
 
   <ItemGroup>
     <!--
-      ⚠ ONLY dotnet-watch ASSEMBLIES MAY BE ADDED HERE ⚠
+      ⚠ ONLY dotnet CLI (dotnet-watch) ASSEMBLIES MAY BE ADDED HERE ⚠
     -->
     <InternalsVisibleTo Include="dotnet-watch" Key="$(AspNetCoreKey)" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\..\Features\Core\Portable\Microsoft.CodeAnalysis.Features.csproj" />
+    <ProjectReference Include="..\..\..\Workspaces\Core\Portable\Microsoft.CodeAnalysis.Workspaces.csproj" />
   </ItemGroup>
 
   <ItemGroup>
